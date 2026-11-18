@@ -1,98 +1,124 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ItemCard } from '../components/ItemCard';
+import { theme } from '../constants/appTheme';
+import { useItems } from '../context/ItemsContext';
+import type { ItemType } from '../types/item';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+const TABS: { key: ItemType; label: string }[] = [
+  { key: 'lost', label: 'Lost' },
+  { key: 'found', label: 'Found' },
+];
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { items: allItems } = useItems();
+  const [tab, setTab] = useState<ItemType>('lost');
+  const [search, setSearch] = useState('');
+
+  const items = allItems.filter(
+    (item) =>
+      item.type === tab &&
+      `${item.title} ${item.description} ${item.location}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase())
+  );
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.appName}>findMyStuff</Text>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+      <View style={styles.tabs}>
+        {TABS.map(({ key, label }) => (
+          <Pressable
+            key={key}
+            style={[styles.tab, tab === key && styles.tabActive]}
+            onPress={() => setTab(key)}
+          >
+            <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+      <TextInput
+        style={styles.search}
+        placeholder="Search items, places..."
+        placeholderTextColor={theme.colors.textMuted}
+        value={search}
+        onChangeText={setSearch}
+      />
+
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+        ListEmptyComponent={<Text style={styles.empty}>No items found.</Text>}
+        renderItem={({ item }) => (
+          <ItemCard
+            item={item}
+            onPress={() =>
+              router.push({ pathname: '/item/[id]', params: { id: item.id } })
+            }
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        )}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  appName: {
+    fontSize: theme.fontSize.xxl,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  tabs: {
     flexDirection: 'row',
+    backgroundColor: theme.colors.primaryLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.xs,
+    marginBottom: theme.spacing.md,
   },
-  safeArea: {
+  tab: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.sm,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  tabActive: { backgroundColor: theme.colors.surface },
+  tabText: { fontSize: theme.fontSize.lg, color: theme.colors.textMuted },
+  tabTextActive: { color: theme.colors.primary, fontWeight: '600' },
+  search: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    fontSize: theme.fontSize.lg,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
   },
-  title: {
+  empty: {
     textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+    marginTop: 40,
+    color: theme.colors.textMuted,
   },
 });
